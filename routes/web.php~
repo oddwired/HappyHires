@@ -1,0 +1,118 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', 'HomeController@index');
+//Route::get('/instance/{admin_id}', 'InstanceController@index');
+//Route::post('/instance/{admin_id}', 'InstanceController@login');
+
+
+//Auth::routes();
+
+Route::group([ 'middleware' => ['database']], function(){
+    Route::get('/instance/{instance}/login', 'AuthController@index');
+    Route::post('/instance/{instance}/login', 'AuthController@userLogin');
+    //Route::get('/instance/{instance}/voted', 'InstanceController@voted');
+    Route::get('/instance/{instance}/results','ResultsController@index');
+    Route::get('/voted/{instance}','InstanceController@voted');
+    Route::get('/election/instance/{instance}/not/open/{start_time}','ElectionOpenCloseController@not_open');
+    Route::get('/election/instance/{instance}/closed/{start_time}','ElectionOpenCloseController@closed');
+    Route::get('/results/instance/{instance}','ResultsController@getResultsPerPosition');
+    Route::get('/results/instance/{instance}/print','ResultsController@print_results');
+    Route::get('/results/instance/{instance}/{position}','ResultsController@show');    //TODO: may cause errors
+    Route::get('/instance/{instance}/chairperson','StatisticsController@index');
+    Route::get('/instance/{instance}/chairperson/login','ChairmanController@getLoginView');
+    Route::post('/instance/{instance}/chairperson/login','ChairmanController@login');
+});
+
+//Route::resource('/results/instance/{instance}','ResultsController');    //TODO: may cause errors
+
+
+Route::get('/chairperson/login', [
+    'as' => 'login',
+    'uses' => 'AuthController@adminLoginIndex'
+]);
+
+
+Route::post('/instance/{instance}/logout', function (){
+    Log::useDailyFiles(storage_path().'/logs/login_in_out.log');
+    Log::info('User/Voter logout successfully.', ['Registration No:' => session('user_reg_no'),'IP:'=> \Request::ip()]);
+    Auth::guard('user')->logout();
+    Auth::guard('chairperson')->logout();
+    return redirect('/');
+})->name('logout_user');
+
+Route::get('/chairperson/logout', [
+    'as' => 'logout',
+    'uses' => 'AuthController@adminLogout'
+]);
+Route::post('/chairperson/login', [
+    'as' => '',
+    'uses' => 'AuthController@adminLogin'
+]);
+Route::get('/chairperson/register', [
+    'as' => '',
+    'uses' => 'Auth\RegisterController@index'
+]);
+Route::post('/chairperson/register', [
+    'as' => 'register',
+    'uses' => 'Auth\RegisterController@create'
+]);
+Route::group(['middleware' => ['chairperson']], function (){
+
+    Route::get('/chairperson', 'AdminController@index');
+    Route::get('/chairperson/home', 'AdminController@index');
+    Route::get('/chairperson/create', 'AdminController@createElection');
+    Route::post('/chairperson/create', 'AdminController@create');
+    Route::get('/chairperson/candidate/photo/{instance}', 'PhotoController@index')->middleware('database');
+    Route::post('/chairperson/candidate/photo/{instance}', 'PhotoController@save')->middleware('database');
+    Route::get('/chairperson/view', 'AdminController@view');
+    Route::get('/chairperson/{instance}/create_positions', 'AdminController@createPositions');
+    Route::get('/chairperson/toggle/instance/close/{instance}','AdminController@instanceClose');
+    Route::get('/chairperson/toggle/instance/open/{instance}','AdminController@instanceOpen');
+    Route::get('/chairperson/toggle/results/close/{instance}','AdminController@resultsClose');
+    Route::get('/chairperson/toggle/results/open/{instance}','AdminController@resultsOpen');
+    Route::get('/chairperson/filter/{instance}', 'FilterController@index')->middleware('database');
+    Route::post('/chairperson/filter/{instance}', 'FilterController@setFilter')->middleware('database');
+    Route::get('/chairperson/voters/{instance}', 'AdminController@getVoters')->middleware('database');
+    Route::get('/chairperson/voters/{instance}/download', 'AdminController@downloadVoters')->middleware('database');
+    Route::get('/chairperson/{instance}/print_tokens',array('as'=>'pdfview', 'uses'=>'TokensController@printTokens'))->middleware('database');
+    Route::get('/chairperson/{instance}/download_tokens',array('as'=>'pdfview', 'uses'=>'TokensController@downloadTokens'))->middleware('database');
+    Route::get('/chairperson/{instance}/manage','ManagerController@index')->middleware('database');
+    Route::post('/chairperson/{instance}/remove','ManagerController@remove')->middleware('database');
+    Route::post('/chairperson/{instance}/add_candidate','ManagerController@add')->middleware('database');
+    Route::post('/chairperson/{instance}/edit','ManagerController@editCandidate')->middleware('database');
+    Route::get('/chairperson/{instance}/edit_positions','ManagerController@editPositions')->middleware('database');
+    Route::post('/chairperson/{instance}/edit_positions','ManagerController@updatePositions')->middleware('database');
+    Route::post('/chairperson/{instance}/{name}/edit','ManagerController@updateCandidate')->middleware('database');
+    Route::get('/chairperson/{instance}/chairperson/register','ChairmanController@index');
+    Route::post('/chairperson/{instance}/chairperson/update','ChairmanController@update');
+    Route::get('/chairperson/{instance}/manage/chairperson','ChairmanController@show');
+    Route::post('/chairperson/{instance}/chairperson/register','ChairmanController@store');
+
+});
+
+Route::group( ['middleware' => ['auth','CheckElectionIfOpen','CheckElectionIfClosed','database']], function()
+{
+    Route::get('/instance/{instance}/', 'InstanceController@index')->middleware('vote_status');
+    Route::get('/instance/{instance}/voter', 'InstanceController@getUserInfo');
+    //Route::post('/instance/{instance}/', 'AuthController@userLogin');
+    Route::get('/instance/{instance}/cart/{id}/{name}/{category}', 'CartController@addToCart');
+    Route::get('/instance/{instance}/my_votes','MyVotesController@index');
+    Route::get('/instance/{instance}/myVotes/{id}/{category}','MyVotesController@delete');
+    Route::get('/instance/{instance}/cast_ballot','InstanceController@castBallot');
+    //Route::get('/dashboard', '');
+    Route::get('/instance/{instance}/candidate/{position}', 'InstanceController@show');
+    Route::get('/instance/{instance}/{position}/abstain', 'InstanceController@abstain');
+});
+
+//Route::get('/home', 'HomeController@index')->name('home');
